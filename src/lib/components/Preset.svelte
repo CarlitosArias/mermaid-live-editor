@@ -1,9 +1,10 @@
 <script lang="ts">
   import Card from '$/components/Card/Card.svelte';
   import { Button, buttonVariants } from '$/components/ui/button';
+  import * as Dialog from '$/components/ui/dialog';
   import * as Popover from '$/components/ui/popover';
   import { getSampleDiagrams, type SampleExample } from '$/util/mermaid';
-  import { updateCode } from '$lib/util/state.svelte';
+  import { inputState, updateCode } from '$lib/util/state.svelte';
   import { logEvent } from '$lib/util/stats';
   import { cn } from '$lib/utils';
   import ShapesIcon from '~icons/material-symbols/account-tree-outline-rounded';
@@ -44,12 +45,41 @@
 
   const samples = { ...getSampleDiagrams(), ...extras };
 
-  const loadSampleDiagram = (diagramType: string, example: SampleExample): void => {
-    updateCode(example.code, {
-      resetPanZoom: true,
-      updateDiagram: true
-    });
+  // Track the last code loaded from a sample to detect user edits.
+  // Initialized to the current code so the first click on a sample
+  // (with the unmodified default) does not trigger the warning.
+  let lastLoadedCode = $state(inputState.code);
+  let confirmOpen = $state(false);
+  let pendingType = $state('');
+  let pendingExample = $state<SampleExample | null>(null);
+
+  const doLoad = (diagramType: string, example: SampleExample): void => {
+    updateCode(example.code, { resetPanZoom: true, updateDiagram: true });
+    lastLoadedCode = example.code;
     logEvent('loadSampleDiagram', { diagramType, exampleTitle: example.title });
+  };
+
+  const loadSampleDiagram = (diagramType: string, example: SampleExample): void => {
+    if (inputState.code.trim() !== lastLoadedCode.trim()) {
+      pendingType = diagramType;
+      pendingExample = example;
+      confirmOpen = true;
+    } else {
+      doLoad(diagramType, example);
+    }
+  };
+
+  const confirmLoad = (): void => {
+    if (pendingExample) doLoad(pendingType, pendingExample);
+    confirmOpen = false;
+    pendingExample = null;
+    pendingType = '';
+  };
+
+  const cancelLoad = (): void => {
+    confirmOpen = false;
+    pendingExample = null;
+    pendingType = '';
   };
 
   const mainDiagrams = [
@@ -108,3 +138,18 @@
     {/each}
   </div>
 </Card>
+
+<Dialog.Root bind:open={confirmOpen}>
+  <Dialog.Content class="max-w-sm">
+    <Dialog.Header>
+      <Dialog.Title>¿Cambiar diagrama?</Dialog.Title>
+      <Dialog.Description>
+        Tienes cambios sin guardar. Si cargas este ejemplo, perderás el código actual.
+      </Dialog.Description>
+    </Dialog.Header>
+    <Dialog.Footer class="gap-2 sm:justify-end">
+      <Button variant="outline" onclick={cancelLoad}>Seguir editando</Button>
+      <Button variant="destructive" onclick={confirmLoad}>Cargar ejemplo</Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
