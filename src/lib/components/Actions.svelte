@@ -221,6 +221,14 @@ ${svgString}`);
     });
   };
 
+  const onDownloadCode = (_event?: Event) => {
+    const blob = new Blob([inputState.code], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    simulateDownload(getFileName('mmd'), url);
+    URL.revokeObjectURL(url);
+    logEvent('download', { type: 'mmd' });
+  };
+
   let gistURL = $state('');
   $effect(() => {
     const { loader } = validatedState.current;
@@ -290,6 +298,7 @@ ${svgString}`);
     <div class="flex gap-2">
       {@render dualActionButton('PNG', onDownloadPNG, urls.current.png)}
       {@render dualActionButton('SVG', onDownloadSVG, urls.current.svg)}
+      {@render dualActionButton('Code', onDownloadCode)}
       <ExternalLinkWrapper domain={getDomain(urls.current.kroki)} isVisible={!!urls.current.kroki}>
         <a target="_blank" rel="noreferrer" class="flex-grow" href={urls.current.kroki}>
           <Button class="action-btn flex w-full items-center gap-2">
